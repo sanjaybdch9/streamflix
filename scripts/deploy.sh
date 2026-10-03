@@ -10,6 +10,24 @@ CLUSTER="${2:-streamflix}"
 NAMESPACE="${NAMESPACE:-streamflix}"
 SERVICES="api-gateway auth-service catalog-service library-service streaming-service recommendation-service"
 
+# Safety check: only deploy code that is committed and pushed, so whatever runs on EKS can
+# always be rebuilt from GitHub. Set ALLOW_UNPUSHED=1 to skip it (e.g. a quick experiment).
+fail() { printf '\n\033[31mDeploy blocked:\033[0m %s\n\n' "$1" >&2; exit 1; }
+if [ "${ALLOW_UNPUSHED:-0}" != "1" ]; then
+  git rev-parse --git-dir >/dev/null 2>&1 || fail "this folder is not a git repository."
+  if [ -n "$(git status --porcelain)" ]; then
+    git status --short >&2
+    fail "you have uncommitted changes (listed above). Commit and push them first:
+  git add -A && git commit -m \"describe your change\" && git push"
+  fi
+  echo "==> Checking GitHub has this commit"
+  git fetch --quiet origin || fail "could not reach GitHub (git fetch failed). Check your internet connection."
+  if [ -z "$(git branch -r --contains HEAD)" ]; then
+    fail "commit $(git rev-parse --short=12 HEAD) is not on GitHub yet. Push it first:
+  git push"
+  fi
+fi
+
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 REGISTRY="$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
 # Tag with the git commit; append -dirty so uncommitted builds are never mistaken for a commit.

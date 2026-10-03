@@ -168,6 +168,9 @@ scripts/deploy.sh $AWS_REGION streamflix
 
 What it does, the same steps as the pipeline:
 
+0. **Refuses to deploy** if there are uncommitted changes or the commit isn't on GitHub, so EKS
+   can always be rebuilt from the repository. For a throwaway experiment, override it with
+   `ALLOW_UNPUSHED=1 scripts/deploy.sh …`; the images are then tagged `-dirty`.
 1. Logs Docker in to ECR.
 2. Builds all 7 images for **`linux/amd64`** and pushes them, tagged with the git commit. EKS
    nodes are x86, so an image built natively on an Apple Silicon Mac would crash with

@@ -420,6 +420,8 @@ Every line should say `Running`. (If some say `ContainerCreating`, wait a minute
 
 **Why:** this one script does the whole app deployment:
 
+0. **Safety check:** it refuses to deploy unless every change is committed and pushed to GitHub.
+   That way, what runs on AWS always matches your GitHub repository.
 1. Builds the 7 app images on your Mac. They're built for Intel/AMD (`linux/amd64`), the chip type
    the AWS computers use, even though your Mac has an Apple chip.
 2. Uploads them to your private image storage (ECR).
@@ -431,6 +433,9 @@ Every line should say `Running`. (If some say `ContainerCreating`, wait a minute
 ```bash
 scripts/deploy.sh us-east-1 streamflix
 ```
+
+If it stops with **`Deploy blocked`**, it tells you exactly what to do, usually
+`git add -A && git commit -m "…" && git push`. Run that, then run the script again.
 
 The first build takes 5–10 minutes. You'll see `==> Building api-gateway`, then the other
 services, then `==> Deploying with Helm`.
@@ -460,6 +465,8 @@ You'll see 14 or more pods (copies of each service, plus the database and cache)
 | Error | Fix |
 |---|---|
 | `Cannot connect to the Docker daemon` | Start Docker Desktop, then run the script again |
+| `Deploy blocked: you have uncommitted changes` | Run `git add -A && git commit -m "your message" && git push`, then run the script again |
+| `Deploy blocked: commit … is not on GitHub yet` | Run `git push`, then run the script again |
 | `no matches for kind "ServiceMonitor"` | You skipped Step 9. Run it, then run this step again |
 | Script ends with `UPGRADE FAILED` / timed out | Run `kubectl -n streamflix get pods`, find the one that isn't `Running`, and run `kubectl -n streamflix logs <pod-name>`. The last lines say why. Fix it and run the script again; Helm undoes failed attempts automatically |
 | Browser can't open the address | Wait 3 minutes (DNS is still being set up), and use `http://`, not `https://` |
@@ -497,10 +504,10 @@ To stop it, go back to that Terminal window and press **Control + C**.
 
 1. Open `frontend/src/components/Hero.jsx` in any text editor.
 2. Find `'F I L M'` and change it to `'N O W   S H O W I N G'`. Save.
-3. Commit the change and deploy it:
+3. Commit the change, push it to GitHub, and deploy it:
 
 ```bash
-git add -A && git commit -m "Change hero label" && scripts/deploy.sh us-east-1 streamflix
+git add -A && git commit -m "Change hero label" && git push && scripts/deploy.sh us-east-1 streamflix
 ```
 
 4. Refresh the website. The label above the big title has changed.
