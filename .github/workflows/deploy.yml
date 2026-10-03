@@ -1,0 +1,159 @@
+# CI/CD on GitHub's servers: every push to main is tested, built and deployed to EKS.
+# Pull requests run the tests only. No AWS keys are stored here: each run gets temporary
+# credentials through OpenID Connect (see terraform/github-actions.tf).
+#
+# Repository variables (Settings → Secrets and variables → Actions → Variables):
+#   AWS_ROLE_ARN   terraform output github_deploy_role_arn   (required)
+#   AWS_REGION     default us-east-1
+#   EKS_CLUSTER    default streamflix
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never run two deploys at once; a newer push waits for the current one to finish.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'deploy-main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  EKS_CLUSTER: ${{ vars.EKS_CLUSTER || 'streamflix' }}
+  NAMESPACE: streamflix
+
+jobs:
+  test:
+    name: Test ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api-gateway, auth-service, catalog-service, library-service, streaming-service, recommendation-service]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+
+  frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+
+  helm-lint:
+    name: Lint Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint helm/streamflix -f helm/streamflix/values-eks.yaml
+
+  build:
+    name: Build & push ${{ matrix.image }}
+    needs: [test, frontend, helm-lint]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # lets the job request the OIDC token for AWS
+    strategy:
+      matrix:
+        image: [frontend, api-gateway, auth-service, catalog-service, library-service, streaming-service, recommendation-service]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push (linux/amd64, tagged with the commit)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.image == 'frontend' && 'frontend' || format('services/{0}', matrix.image) }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/streamflix/${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    name: Deploy to EKS
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.url.outputs.app_url }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: azure/setup-helm@v4
+      - uses: azure/setup-kubectl@v4
+
+      - name: Connect to the cluster
+        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER"
+
+      - name: Helm upgrade (rolls back automatically on failure)
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          if helm version --short | grep -q '^v3'; then ROLLBACK=--atomic; else ROLLBACK=--rollback-on-failure; fi
+          helm upgrade --install streamflix helm/streamflix \
+            --namespace "$NAMESPACE" --create-namespace \
+            -f helm/streamflix/values-eks.yaml \
+            --set global.imageRegistry="$REGISTRY" \
+            --set global.imageTag="$GITHUB_SHA" \
+            "$ROLLBACK" --wait --timeout 10m
+
+      - name: Smoke test from inside the cluster
+        run: |
+          kubectl -n "$NAMESPACE" run "smoke-${GITHUB_RUN_ID}" --rm -i --restart=Never \
+            --image=curlimages/curl:8.14.1 -- \
+            curl -fsS --retry 10 --retry-delay 6 --retry-all-errors http://api-gateway:4000/api/status
+
+      - name: Publish the app URL
+        id: url
+        run: |
+          HOST=$(kubectl -n "$NAMESPACE" get svc frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          IP=$(getent hosts "$HOST" | awk '{print $1; exit}')
+          echo "app_url=http://$HOST" >> "$GITHUB_OUTPUT"
+          {
+            echo "### 🚀 StreamFlix deployed"
+            echo "- Commit: \`${GITHUB_SHA::12}\`"
+            echo "- App: http://$HOST"
+            [ -n "$IP" ] && echo "- Friendly URL: http://streamflix.${IP//./-}.sslip.io"
+            echo "- Status: http://$HOST/status"
+          } >> "$GITHUB_STEP_SUMMARY"
