@@ -1,7 +1,6 @@
 // Demo catalog. Titles are fictional; every video is an openly licensed sample clip
 // (Blender Foundation open movies, W3C/MDN test media, test-videos.co.uk, Video.js).
 const V = {
-  sintelTrailer: 'https://download.blender.org/durian/trailer/sintel_trailer-480p.mp4',
   sintelW3c: 'https://media.w3.org/2010/05/sintel/trailer.mp4',
   bunnyTrailer: 'https://media.w3.org/2010/05/bunny/trailer.mp4',
   bunnyFull: 'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
@@ -18,7 +17,7 @@ export const seedTitles = [
   {
     id: 'ember-protocol', title: 'The Ember Protocol', kind: 'movie', year: 2025, maturity: '16+', durationMinutes: 124,
     genres: ['Action', 'Thriller'], cast: ['Mira Okafor', 'Daniel Reyes'], palette: ['#7f1d1d', '#f97316'],
-    popularity: 98, featured: true, videoUrl: V.sintelTrailer,
+    popularity: 98, featured: true, videoUrl: V.sintelW3c,
     synopsis: 'A disgraced field agent has 48 hours to stop a rogue AI from igniting a global blackout — with only a stolen key and a partner she cannot trust.',
   },
   {
@@ -96,7 +95,7 @@ export const seedTitles = [
   {
     id: 'scale-and-shadow', title: 'Scale & Shadow', kind: 'movie', year: 2025, maturity: '13+', durationMinutes: 131,
     genres: ['Fantasy', 'Adventure', 'Action'], cast: ['Sel Harrow', 'Ruben Okoye'], palette: ['#450a0a', '#fca5a5'],
-    popularity: 93, featured: true, videoUrl: V.sintelTrailer,
+    popularity: 93, featured: true, videoUrl: V.sintelW3c,
     synopsis: 'The epic conclusion of the Keeper saga: one last flight over the burning peaks.',
   },
   {
@@ -124,3 +123,10 @@ export const seedTitles = [
     synopsis: 'Six misfit trainees. One very old space station. Zero chance of everything going to plan.',
   },
 ];
+
+// Sources that stopped working, mapped to their replacements. Applied on every start, so
+// databases seeded before a source broke get repaired without being re-seeded.
+// download.blender.org returns 403 to AWS data-centre IPs, so video failed on EKS.
+export const retiredVideoUrls = {
+  'https://download.blender.org/durian/trailer/sintel_trailer-480p.mp4': V.sintelW3c,
+};

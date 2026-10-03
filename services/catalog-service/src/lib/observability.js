@@ -13,9 +13,28 @@ export class HttpError extends Error {
   }
 }
 
-export function createLogger(serviceName) {
-  return pino({ level: process.env.LOG_LEVEL || 'info', base: { service: serviceName } });
+// Credentials and personal data must never reach log storage, where many people can read them.
+const REDACT_PATHS = [
+  'req.headers.authorization',
+  'req.headers.cookie',
+  'req.headers["x-user-email"]',
+  'req.query.token',
+  'res.headers["set-cookie"]',
+];
+
+export function createLogger(serviceName, { level = process.env.LOG_LEVEL || 'info', destination } = {}) {
+  return pino(
+    {
+      level,
+      base: { service: serviceName },
+      redact: { paths: REDACT_PATHS, censor: '[REDACTED]' },
+    },
+    destination
+  );
 }
+
+// Signed playback URLs carry their token in the query string.
+const scrubUrl = (url) => (typeof url === 'string' ? url.replace(/([?&]token=)[^&]*/g, '$1[REDACTED]') : url);
 
 export function instrument(app, serviceName, { readiness, logger = createLogger(serviceName) } = {}) {
   const register = new client.Registry();
@@ -35,6 +54,12 @@ export function instrument(app, serviceName, { readiness, logger = createLogger(
     pinoHttp({
       logger,
       autoLogging: { ignore: (req) => quiet.has(req.url) },
+      serializers: {
+        req: (req) => {
+          req.url = scrubUrl(req.url);
+          return req;
+        },
+      },
     })
   );
 

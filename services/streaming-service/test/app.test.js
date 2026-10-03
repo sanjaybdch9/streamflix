@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createApp } from '../src/app.js';
-import { HttpError } from '../src/lib/observability.js';
+import { HttpError, createLogger } from '../src/lib/observability.js';
 import { withServer } from './helpers.js';
 
 const VIDEO = Buffer.alloc(1000, 7);
@@ -74,5 +74,31 @@ test('requires auth for sessions and blocks unapproved origins', async () => {
     assert.equal((await session(base, 'missing')).status, 404);
     const { body } = await session(base, 'evil');
     assert.equal((await fetch(base + playPath(body.playbackUrl))).status, 403);
+  });
+});
+
+test('never writes tokens or emails to the logs', async () => {
+  const lines = [];
+  const destination = { write: (line) => lines.push(line) };
+  const logger = createLogger('streaming-service', { level: 'info', destination });
+  await withServer(origin(), async (originBase) => {
+    const catalog = { source: async (id) => ({ id, videoUrl: `${originBase}/video.mp4` }) };
+    const app = createApp({ catalog, playbackSecret: 'pb-secret', allowedHosts: ['127.0.0.1'], logger });
+    await withServer(app, async (base) => {
+      const res = await fetch(`${base}/stream/drift/session`, {
+        method: 'POST',
+        headers: { 'x-user-id': 'u1', 'x-user-email': 'person@example.com', authorization: 'Bearer secret-login-token', cookie: 'sid=secret-cookie' },
+      });
+      const { playbackUrl } = await res.json();
+      const token = new URL(playbackUrl, 'http://x').searchParams.get('token');
+      await (await fetch(base + playbackUrl.replace('/api', ''))).arrayBuffer();
+
+      const log = lines.join('');
+      assert.ok(log.includes('/stream/drift/play'), 'requests are still logged');
+      for (const secret of ['secret-login-token', 'secret-cookie', 'person@example.com', token]) {
+        assert.ok(!log.includes(secret), `log leaked ${secret.slice(0, 12)}…`);
+      }
+      assert.ok(log.includes('[REDACTED]'));
+    });
   });
 });

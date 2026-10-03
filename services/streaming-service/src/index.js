@@ -11,7 +11,6 @@ if (!playbackSecret) {
 }
 
 const defaultHosts = [
-  'download.blender.org',
   'media.w3.org',
   'archive.org',
   'test-videos.co.uk',

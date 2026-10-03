@@ -107,6 +107,16 @@ export function titleRepository(pool) {
       return rows;
     },
 
+    // Point titles at replacement sources; returns how many rows changed.
+    async replaceVideoUrls(replacements) {
+      let changed = 0;
+      for (const [from, to] of Object.entries(replacements)) {
+        const { rowCount } = await pool.query('UPDATE titles SET video_url = $2 WHERE video_url = $1', [from, to]);
+        changed += rowCount;
+      }
+      return changed;
+    },
+
     async save(title) {
       const { rows } = await upsert(title);
       return toTitle(rows[0]);
