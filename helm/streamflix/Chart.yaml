@@ -1,0 +1,7 @@
+apiVersion: v2
+name: streamflix
+description: StreamFlix — a three-tier, microservice video streaming platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords: [streaming, microservices, nodejs, react]

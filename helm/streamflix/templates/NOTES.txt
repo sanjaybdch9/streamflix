@@ -1,0 +1,18 @@
+StreamFlix {{ .Chart.AppVersion }} is deploying to namespace "{{ .Release.Namespace }}".
+
+Watch the rollout:
+  kubectl -n {{ .Release.Namespace }} get pods -w
+
+Find the app URL:
+{{- if .Values.ingress.enabled }}
+  http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else if eq .Values.frontend.service.type "LoadBalancer" }}
+  kubectl -n {{ .Release.Namespace }} get svc frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}'
+  (a cloud load balancer can take 2-3 minutes to get an address)
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/frontend 8080:{{ .Values.frontend.service.port }}
+  then open http://localhost:8080
+{{- end }}
+
+Service health (all microservices, as seen by the gateway):
+  <app URL>/api/status

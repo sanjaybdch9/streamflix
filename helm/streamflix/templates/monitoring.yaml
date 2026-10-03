@@ -1,0 +1,38 @@
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: streamflix
+  labels:
+    {{- include "streamflix.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: streamflix
+      app.kubernetes.io/component: application
+  namespaceSelector:
+    matchNames: [{{ .Release.Namespace }}]
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      # Keep the service label set by each app instead of renaming it to exported_service.
+      honorLabels: true
+---
+{{- end }}
+{{- if .Values.monitoring.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: streamflix-grafana-dashboard
+  labels:
+    {{- include "streamflix.labels" . | nindent 4 }}
+    # Picked up by the kube-prometheus-stack Grafana dashboard sidecar.
+    grafana_dashboard: "1"
+data:
+  streamflix-overview.json: |-
+    {{- .Files.Get "dashboards/streamflix-overview.json" | nindent 4 }}
+{{- end }}

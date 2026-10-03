@@ -1,0 +1,141 @@
+# Full stack on one machine:  cp .env.example .env && docker compose up --build
+#   App         http://localhost:8080
+#   Grafana     http://localhost:3000  (admin / value of GRAFANA_ADMIN_PASSWORD)
+#   Prometheus  http://localhost:9090
+name: streamflix
+
+x-service: &service
+  restart: unless-stopped
+  environment: &common-env
+    LOG_LEVEL: info
+  networks: [backend]
+
+services:
+  # ---------- Tier 1: presentation ----------
+  frontend:
+    build: ./frontend
+    ports: ["8080:8080"]
+    environment:
+      API_GATEWAY_URL: http://api-gateway:4000
+    depends_on: [api-gateway]
+    networks: [frontend, backend]
+    restart: unless-stopped
+
+  # ---------- Tier 2: application (microservices) ----------
+  api-gateway:
+    <<: *service
+    build: ./services/api-gateway
+    environment:
+      <<: *common-env
+      PORT: 4000
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      TRUST_PROXY_HOPS: 1
+    depends_on: [auth-service, catalog-service, library-service, streaming-service, recommendation-service]
+
+  auth-service:
+    <<: *service
+    build: ./services/auth-service
+    environment:
+      <<: *common-env
+      PORT: 4001
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      DATABASE_URL: postgres://streamflix:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  catalog-service:
+    <<: *service
+    build: ./services/catalog-service
+    environment:
+      <<: *common-env
+      PORT: 4002
+      DATABASE_URL: postgres://streamflix:${POSTGRES_PASSWORD}@postgres:5432/catalog_db
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  library-service:
+    <<: *service
+    build: ./services/library-service
+    environment:
+      <<: *common-env
+      PORT: 4003
+      DATABASE_URL: postgres://streamflix:${POSTGRES_PASSWORD}@postgres:5432/library_db
+      CATALOG_URL: http://catalog-service:4002
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  streaming-service:
+    <<: *service
+    build: ./services/streaming-service
+    environment:
+      <<: *common-env
+      PORT: 4004
+      PLAYBACK_SECRET: ${PLAYBACK_SECRET:?set PLAYBACK_SECRET in .env}
+      CATALOG_URL: http://catalog-service:4002
+
+  recommendation-service:
+    <<: *service
+    build: ./services/recommendation-service
+    environment:
+      <<: *common-env
+      PORT: 4005
+      CATALOG_URL: http://catalog-service:4002
+      LIBRARY_URL: http://library-service:4003
+
+  # ---------- Tier 3: data ----------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: streamflix
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: postgres
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U streamflix"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+    restart: unless-stopped
+
+  # ---------- Observability ----------
+  prometheus:
+    image: prom/prometheus:v3.4.1
+    volumes: ["./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["9090:9090"]
+    networks: [backend]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.0.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+    networks: [backend]
+    restart: unless-stopped
+
+networks:
+  frontend: {}
+  backend: {}
+
+volumes:
+  pgdata: {}

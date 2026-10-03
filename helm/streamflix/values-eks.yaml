@@ -1,0 +1,24 @@
+# AWS EKS overrides. The pipeline also sets global.imageRegistry and global.imageTag.
+frontend:
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+  autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 6, targetCPUUtilizationPercentage: 70 }
+
+global:
+  imagePullPolicy: Always
+
+storageClass:
+  create: true
+
+postgresql:
+  storageClass: gp3
+  storage: 20Gi
+
+monitoring:
+  serviceMonitor:
+    enabled: true
+  grafanaDashboard:
+    enabled: true

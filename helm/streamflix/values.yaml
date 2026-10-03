@@ -1,0 +1,170 @@
+# Default values work on any cluster (Docker Desktop, kind, minikube).
+# See values-eks.yaml for the AWS EKS overrides used by the Jenkins pipeline.
+
+global:
+  # Registry host, e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com. Empty = local images.
+  imageRegistry: ""
+  imageRepositoryPrefix: streamflix
+  imageTag: latest
+  imagePullPolicy: IfNotPresent
+
+logLevel: info
+
+secrets:
+  # Name of a pre-created Secret with keys JWT_SECRET, PLAYBACK_SECRET, POSTGRES_PASSWORD.
+  # Leave empty to let the chart generate one (kept across upgrades and uninstalls).
+  existingSecret: ""
+
+# Comma-separated emails that receive the admin role on sign-up.
+adminEmails: ""
+
+# ---------- Tier 1: presentation ----------
+frontend:
+  replicas: 2
+  port: 8080
+  service:
+    type: LoadBalancer
+    port: 80
+    annotations: {}
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 128Mi }
+  autoscaling: { enabled: false, minReplicas: 2, maxReplicas: 6, targetCPUUtilizationPercentage: 70 }
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  annotations: {}
+  tls: []
+
+# ---------- Tier 2: application ----------
+# Flags per service: jwt / playback inject secrets, database creates DATABASE_URL, redis adds REDIS_URL.
+services:
+  api-gateway:
+    enabled: true
+    port: 4000
+    replicas: 2
+    jwt: true
+    env:
+      AUTH_URL: http://auth-service:4001
+      CATALOG_URL: http://catalog-service:4002
+      LIBRARY_URL: http://library-service:4003
+      STREAMING_URL: http://streaming-service:4004
+      RECOMMENDATION_URL: http://recommendation-service:4005
+      RATE_LIMIT_PER_MINUTE: "300"
+      TRUST_PROXY_HOPS: "1"   # nginx (frontend) is the only proxy in front of the gateway
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { memory: 256Mi }
+    autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 8, targetCPUUtilizationPercentage: 70 }
+
+  auth-service:
+    enabled: true
+    port: 4001
+    replicas: 2
+    jwt: true
+    database: auth_db
+    env: {}
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { memory: 256Mi }
+    autoscaling: { enabled: false }
+
+  catalog-service:
+    enabled: true
+    port: 4002
+    replicas: 2
+    database: catalog_db
+    redis: true
+    env: {}
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { memory: 256Mi }
+    autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 6, targetCPUUtilizationPercentage: 70 }
+
+  library-service:
+    enabled: true
+    port: 4003
+    replicas: 2
+    database: library_db
+    env:
+      CATALOG_URL: http://catalog-service:4002
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { memory: 256Mi }
+    autoscaling: { enabled: false }
+
+  streaming-service:
+    enabled: true
+    port: 4004
+    replicas: 2
+    playback: true
+    env:
+      CATALOG_URL: http://catalog-service:4002
+    resources:
+      requests: { cpu: 150m, memory: 128Mi }
+      limits: { memory: 384Mi }
+    autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 10, targetCPUUtilizationPercentage: 60 }
+
+  recommendation-service:
+    enabled: true
+    port: 4005
+    replicas: 1
+    env:
+      CATALOG_URL: http://catalog-service:4002
+      LIBRARY_URL: http://library-service:4003
+    resources:
+      requests: { cpu: 50m, memory: 96Mi }
+      limits: { memory: 192Mi }
+    autoscaling: { enabled: false }
+
+# ---------- Tier 3: data ----------
+database:
+  user: streamflix
+  port: 5432
+  # node-postgres sslmode. Use "no-verify" for AWS RDS (TLS without bundling the RDS CA).
+  sslmode: ""
+
+# In-cluster PostgreSQL. Set enabled=false and externalDatabase.host to use RDS instead.
+postgresql:
+  enabled: true
+  image: postgres:16-alpine
+  storage: 10Gi
+  storageClass: ""
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 1Gi }
+
+externalDatabase:
+  host: ""
+
+redis:
+  enabled: true
+  image: redis:7-alpine
+  maxMemory: 128mb
+  externalUrl: ""
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 192Mi }
+
+# Create a gp3 StorageClass (EKS 1.30+ no longer marks gp2 as default).
+storageClass:
+  create: false
+  name: gp3
+  provisioner: ebs.csi.aws.com
+
+# Restrict the data tier to traffic from application pods (needs a CNI that enforces NetworkPolicy).
+networkPolicy:
+  enabled: false
+
+# ---------- Observability (requires kube-prometheus-stack) ----------
+monitoring:
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    # Must match your Prometheus serviceMonitorSelector.
+    labels:
+      release: kube-prometheus-stack
+  grafanaDashboard:
+    enabled: false

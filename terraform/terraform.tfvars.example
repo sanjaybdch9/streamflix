@@ -1,0 +1,15 @@
+# cp terraform.tfvars.example terraform.tfvars
+region             = "ap-south-1"
+environment        = "dev"
+cluster_name       = "streamflix"
+kubernetes_version = "1.33"
+
+node_instance_types = ["t3.medium"]
+node_capacity_type  = "ON_DEMAND" # SPOT is ~70% cheaper for dev
+node_desired_size   = 3
+
+# IAM role Jenkins runs as (instance profile or assumed role), so the pipeline can deploy.
+# ci_principal_arn = "arn:aws:iam::123456789012:role/jenkins"
+
+# Managed Postgres instead of the in-cluster StatefulSet.
+create_rds = false

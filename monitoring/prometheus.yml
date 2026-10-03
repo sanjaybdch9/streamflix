@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: streamflix
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - api-gateway:4000
+          - auth-service:4001
+          - catalog-service:4002
+          - library-service:4003
+          - streaming-service:4004
+          - recommendation-service:4005

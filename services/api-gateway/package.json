@@ -1,0 +1,25 @@
+{
+  "name": "@streamflix/api-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Edge gateway: JWT verification, rate limiting and routing to microservices",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "LOG_LEVEL=silent node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.1",
+    "http-proxy-middleware": "^3.0.5",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^9.7.0",
+    "pino-http": "^10.5.0",
+    "prom-client": "^15.1.3"
+  }
+}
