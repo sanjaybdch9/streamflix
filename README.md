@@ -106,6 +106,10 @@ cd frontend && npm install && npm run dev                # http://localhost:5173
 
 ## Deploy to AWS EKS
 
+> **First time deploying?** Start with **[BEGINNER-GUIDE.md](BEGINNER-GUIDE.md)**
+> ([PDF](docs/StreamFlix-Beginner-Deployment-Guide.pdf)): 13 numbered steps from creating an AWS
+> account to deleting everything, with what you should see and how to fix common errors.
+>
 > The complete step-by-step runbook — IAM setup, verification, Jenkins wiring, troubleshooting
 > and teardown — is in **[DEPLOYMENT.md](DEPLOYMENT.md)**. Below is the short version.
 
@@ -203,6 +207,8 @@ streamflix/
 ├── helm/streamflix/         Kubernetes chart (values.yaml, values-eks.yaml)
 ├── terraform/               AWS VPC, EKS, ECR, optional RDS
 ├── scripts/                 deploy.sh, eks-bootstrap.sh, sync-shared.sh
-├── DEPLOYMENT.md            end-to-end EKS runbook
+├── BEGINNER-GUIDE.md        step-by-step guide for first-time deployers
+├── DEPLOYMENT.md            end-to-end EKS runbook (engineer level)
+├── docs/                    PDF versions of both guides
 └── Jenkinsfile
 ```
