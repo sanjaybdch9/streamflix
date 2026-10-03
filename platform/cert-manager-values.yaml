@@ -1,0 +1,7 @@
+# cert-manager: requests and auto-renews free Let's Encrypt certificates (chart jetstack/cert-manager v1.21.2).
+crds:
+  enabled: true
+  keep: true # don't delete certificates if the chart is ever uninstalled
+
+resources:
+  requests: { cpu: 20m, memory: 64Mi }

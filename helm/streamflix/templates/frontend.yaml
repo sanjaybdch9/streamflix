@@ -103,6 +103,27 @@ spec:
           averageUtilization: {{ .Values.frontend.autoscaling.targetCPUUtilizationPercentage }}
 {{- end }}
 {{- if .Values.ingress.enabled }}
+{{- /* Only reference the redirect Middleware when Traefik's CRD exists: a router that points
+       at a missing middleware is disabled by Traefik, which would take the whole site down. */}}
+{{- $redirect := and .Values.ingress.traefikHttpsRedirect (.Capabilities.APIVersions.Has "traefik.io/v1alpha1/Middleware") }}
+{{- $annotations := deepCopy (.Values.ingress.annotations | default dict) }}
+{{- with .Values.ingress.clusterIssuer }}
+{{- $_ := set $annotations "cert-manager.io/cluster-issuer" . }}
+{{- end }}
+{{- if $redirect }}
+{{- $_ := set $annotations "traefik.ingress.kubernetes.io/router.middlewares" (printf "%s-https-redirect@kubernetescrd" .Release.Namespace) }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: https-redirect
+  labels:
+    {{- include "streamflix.labels" . | nindent 4 }}
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+{{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -110,7 +131,7 @@ metadata:
   name: streamflix
   labels:
     {{- include "streamflix.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  {{- with $annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -118,9 +139,14 @@ spec:
   {{- with .Values.ingress.className }}
   ingressClassName: {{ . }}
   {{- end }}
-  {{- with .Values.ingress.tls }}
+  {{- if .Values.ingress.tls }}
   tls:
-    {{- toYaml . | nindent 4 }}
+    {{- toYaml .Values.ingress.tls | nindent 4 }}
+  {{- else if and .Values.ingress.clusterIssuer .Values.ingress.host }}
+  # cert-manager stores the issued certificate in this Secret and renews it automatically.
+  tls:
+    - hosts: [{{ .Values.ingress.host | quote }}]
+      secretName: streamflix-tls
   {{- end }}
   rules:
     - {{- with .Values.ingress.host }}

@@ -36,6 +36,11 @@ ingress:
   className: ""
   host: ""
   annotations: {}
+  # Name of a cert-manager ClusterIssuer (e.g. letsencrypt). Adds the annotation and a TLS
+  # section for `host`, so a free certificate is issued and renewed automatically.
+  clusterIssuer: ""
+  # Traefik only: redirect HTTP to HTTPS for this site (creates a Traefik Middleware).
+  traefikHttpsRedirect: false
   tls: []
 
 # ---------- Tier 2: application ----------

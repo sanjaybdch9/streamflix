@@ -1,0 +1,77 @@
+# Cluster-wide add-ons for HTTPS: cert-manager (Let's Encrypt certificates) and Traefik (ingress).
+# Runs when anything in platform/ changes on main, or manually from the Actions tab.
+name: Platform
+
+on:
+  push:
+    branches: [main]
+    paths: ['platform/**', '.github/workflows/platform.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: platform
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  EKS_CLUSTER: ${{ vars.EKS_CLUSTER || 'streamflix' }}
+
+jobs:
+  install:
+    name: Install cert-manager + Traefik
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: azure/setup-helm@v4
+      - uses: azure/setup-kubectl@v4
+      - run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER"
+
+      - name: Add chart repositories
+        run: |
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo add traefik https://traefik.github.io/charts
+          helm repo update
+
+      - name: cert-manager
+        run: |
+          helm upgrade --install cert-manager jetstack/cert-manager --version v1.21.2 \
+            --namespace cert-manager --create-namespace \
+            -f platform/cert-manager-values.yaml --wait --timeout 10m
+
+      - name: Traefik
+        run: |
+          helm upgrade --install traefik traefik/traefik --version 41.6.1 \
+            --namespace traefik --create-namespace \
+            -f platform/traefik-values.yaml --wait --timeout 10m
+
+      - name: Let's Encrypt issuers
+        run: kubectl apply -f platform/cluster-issuer.yaml
+
+      - name: Publish the Traefik load balancer address
+        run: |
+          for _ in $(seq 1 30); do
+            HOST=$(kubectl -n traefik get svc traefik -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            [ -n "$HOST" ] && break
+            sleep 10
+          done
+          IPS=""
+          for _ in $(seq 1 30); do
+            IPS=$(getent ahostsv4 "$HOST" | awk '{print $1}' | sort -u | tr '\n' ' ')
+            [ -n "$IPS" ] && break
+            sleep 10
+          done
+          {
+            echo "### Traefik load balancer"
+            echo "- Hostname: \`$HOST\`"
+            echo "- IPs: \`${IPS:-not resolvable yet, re-run in a few minutes}\`"
+            echo "- Point your DNS (e.g. DuckDNS) at one of these IPs."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Traefik LB: $HOST  IPs: $IPS"

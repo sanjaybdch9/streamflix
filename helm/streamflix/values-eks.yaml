@@ -7,6 +7,15 @@ frontend:
       service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
   autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 6, targetCPUUtilizationPercentage: 70 }
 
+# Public HTTPS entry point through Traefik, with a free Let's Encrypt certificate
+# (cluster add-ons in platform/, installed by the Platform workflow).
+ingress:
+  enabled: true
+  className: traefik
+  host: streamflixer.duckdns.org
+  clusterIssuer: letsencrypt
+  traefikHttpsRedirect: true
+
 global:
   imagePullPolicy: Always
 
