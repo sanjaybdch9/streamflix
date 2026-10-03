@@ -165,7 +165,28 @@ helm upgrade --install streamflix helm/streamflix ... \
 - A ServiceMonitor and Grafana dashboard ConfigMap, picked up by kube-prometheus-stack.
 - Optional Ingress, and an optional NetworkPolicy so the data tier only accepts application pods.
 
-## CI/CD (Jenkins)
+## CI/CD (GitHub Actions) — the default
+
+Every push to `main` deploys automatically from GitHub; nothing is built on a laptop.
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on GitHub's servers:
+
+```
+test ×6 services ─┐
+build frontend ───┼─► build & push 7 images (linux/amd64, tag = commit SHA) ─► helm upgrade ─► smoke test
+helm lint ────────┘        (in parallel, cached)                       (auto-rollback)
+```
+
+- **No AWS keys in GitHub.** Each run gets temporary AWS credentials through OpenID Connect.
+  Only this repository's `main` branch can assume the deploy role (`terraform/github-actions.tf`).
+- **Pull requests** run the tests and lint only; they never deploy. Documentation-only pushes
+  (Markdown and `docs/`) don't trigger a deploy.
+- The run summary shows the commit, the app URL and a friendly `sslip.io` address.
+- **Setup (once):** `terraform apply`, then set the repository variables `AWS_ROLE_ARN`
+  (`terraform output github_deploy_role_arn`), `AWS_REGION` and `EKS_CLUSTER`.
+- `scripts/deploy.sh` still works as a manual fallback. It refuses unpushed code, so EKS
+  always matches GitHub either way.
+
+## CI/CD (Jenkins) — alternative
 
 `Jenkinsfile` stages: **validate → unit tests (7 in parallel, inside `node:22-alpine`) → helm lint
 → build and push 7 images tagged with the git SHA → `helm upgrade --atomic` (automatic rollback)

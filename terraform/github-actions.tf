@@ -9,8 +9,20 @@ variable "github_repository" {
   default     = "sanjaybdch9/streamflix"
 }
 
+# Repositories created recently use GitHub's immutable OIDC subject, which embeds the numeric
+# owner and repository IDs ("repo:owner@123/name@456:..."), so a deleted-and-recreated repo with
+# the same name can never assume the role. Find yours with:
+#   gh api repos/OWNER/REPO/actions/oidc/customization/sub --jq .sub_claim_prefix
+# Leave empty for repositories that still use the classic "repo:owner/name" subject.
+variable "github_oidc_subject_prefix" {
+  description = "Immutable OIDC subject prefix of the repository (see comment above), or empty"
+  type        = string
+  default     = "repo:sanjaybdch9@61964215/streamflix@1402766653"
+}
+
 locals {
   github_enabled = var.github_repository != ""
+  github_subject = var.github_oidc_subject_prefix != "" ? var.github_oidc_subject_prefix : "repo:${var.github_repository}"
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -40,8 +52,8 @@ data "aws_iam_policy_document" "github_trust" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repository}:ref:refs/heads/main",
-        "repo:${var.github_repository}:environment:production",
+        "${local.github_subject}:ref:refs/heads/main",
+        "${local.github_subject}:environment:production",
       ]
     }
   }
