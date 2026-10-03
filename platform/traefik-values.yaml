@@ -1,7 +1,18 @@
 # Traefik: the cluster's HTTPS front door (chart traefik/traefik 41.6.1, Traefik v3.7).
 # ingress-nginx was retired by the Kubernetes project in 2026, so StreamFlix uses Traefik.
 deployment:
-  replicas: 2
+  replicas: 3 # one per availability zone (see topologySpreadConstraints)
+
+# With externalTrafficPolicy Local, a load balancer IP only works if its zone runs a Traefik
+# pod. Spread pods across zones, and let the NLB cross zones as a backup.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: traefik
+        app.kubernetes.io/instance: traefik-traefik
 
 ingressClass:
   enabled: true
@@ -23,6 +34,7 @@ service:
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
   spec:
     type: LoadBalancer
     # Keep the visitor's real IP (no SNAT), so rate limiting works per visitor.
