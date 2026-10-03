@@ -36,12 +36,12 @@ test('lists, filters and fetches titles', async () => {
     const docs = await (await fetch(`${base}/catalog/titles?genre=Documentary`)).json();
     assert.ok(docs.items.every((t) => t.genres.includes('Documentary')));
 
-    const byIds = await (await fetch(`${base}/catalog/titles?ids=drift,bloom`)).json();
-    assert.deepEqual(byIds.items.map((t) => t.id).sort(), ['bloom', 'drift']);
+    const byIds = await (await fetch(`${base}/catalog/titles?ids=koro,bloom`)).json();
+    assert.deepEqual(byIds.items.map((t) => t.id).sort(), ['bloom', 'koro']);
 
-    const drift = await (await fetch(`${base}/catalog/titles/drift`)).json();
+    const drift = await (await fetch(`${base}/catalog/titles/koro`)).json();
     assert.equal(drift.title.videoUrl, undefined, 'source URL must not leak to clients');
-    const source = await (await fetch(`${base}/internal/titles/drift/source`)).json();
+    const source = await (await fetch(`${base}/internal/titles/koro/source`)).json();
     assert.match(source.videoUrl, /^https:/);
     assert.equal((await fetch(`${base}/catalog/titles/nope`)).status, 404);
   });

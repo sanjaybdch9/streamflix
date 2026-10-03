@@ -15,7 +15,6 @@ const defaultHosts = [
   'archive.org',
   'test-videos.co.uk',
   'interactive-examples.mdn.mozilla.net',
-  'vjs.zencdn.net',
 ];
 const allowedHosts = process.env.STREAM_ALLOWED_HOSTS
   ? process.env.STREAM_ALLOWED_HOSTS.split(',').map((h) => h.trim()).filter(Boolean)

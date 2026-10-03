@@ -61,10 +61,15 @@ export function createApp({ catalog, playbackSecret, allowedHosts, tokenTtl = '4
 
     const controller = new AbortController();
     res.on('close', () => controller.abort());
-    const upstream = await fetch(source, {
-      headers: { 'accept-encoding': 'identity', ...(range ? { range } : {}) },
-      signal: controller.signal,
-    });
+    // Public video archives occasionally return a transient 5xx; one quick retry hides it from viewers.
+    const fetchOrigin = () =>
+      fetch(source, { headers: { 'accept-encoding': 'identity', ...(range ? { range } : {}) }, signal: controller.signal });
+    let upstream = await fetchOrigin();
+    if (upstream.status >= 500 && !controller.signal.aborted) {
+      await upstream.body?.cancel();
+      req.log.warn({ status: upstream.status, titleId }, 'origin error, retrying once');
+      upstream = await fetchOrigin();
+    }
     if (![200, 206, 416].includes(upstream.status) || !upstream.body) {
       req.log.warn({ status: upstream.status, titleId }, 'origin error');
       throw new HttpError(502, 'Video origin unavailable');

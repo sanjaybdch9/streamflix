@@ -10,15 +10,13 @@ const port = Number(process.env.PORT || 4002);
 
 const pool = await connectDatabase({ connectionString: process.env.DATABASE_URL, migrations, log });
 const titles = titleRepository(pool);
-const seeded = await titles.seedIfEmpty();
-if (seeded) log.info({ seeded }, 'seeded demo catalog');
+log.info(await titles.syncSeed(), 'demo catalog synced');
 
 const cache = createCache({ url: process.env.REDIS_URL, log });
 const repaired = await titles.replaceVideoUrls(retiredVideoUrls);
-if (repaired) {
-  log.info({ repaired }, 'replaced retired video sources');
-  await cache.invalidateAll(); // cached titles still hold the old URLs
-}
+if (repaired) log.info({ repaired }, 'replaced retired video sources');
+// Cached responses may predate the sync above.
+await cache.invalidateAll();
 const app = createApp({
   titles,
   cache,

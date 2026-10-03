@@ -23,6 +23,7 @@ export default function Hero({ titles }) {
       className="hero"
       style={{ background: `radial-gradient(80% 120% at 85% 20%, ${to}66 0%, transparent 60%), linear-gradient(110deg, #0b0b0f 25%, ${from} 100%)` }}
     >
+      {title.backdropUrl && <img key={title.backdropUrl} className="hero-backdrop" src={title.backdropUrl} alt="" />}
       <div className="hero-content" key={title.id}>
         <p className="hero-kicker">{title.kind === 'series' ? 'S E R I E S' : 'F I L M'}</p>
         <h1>{title.title}</h1>

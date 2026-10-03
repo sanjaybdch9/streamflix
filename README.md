@@ -76,9 +76,9 @@ Design choices worth knowing:
   (`src/lib/`), so it builds and deploys independently. Edit `services/_shared/` and run
   `scripts/sync-shared.sh`.
 
-The demo catalog has 18 fictional titles. Every video is an **openly licensed sample clip**:
-Blender Foundation open movies, W3C/MDN test media, test-videos.co.uk and Video.js samples.
-Title artwork is generated from each title's colour palette, so no images can break.
+The demo catalog has 17 fictional titles. Every video **and every image** is openly licensed;
+title artwork is a still taken from each title's own film (`frontend/public/titles/`). See
+[Credits](#credits).
 
 ## Run it locally (Docker Compose)
 
@@ -233,3 +233,22 @@ streamflix/
 ├── docs/                    PDF versions of both guides
 └── Jenkinsfile
 ```
+
+## Credits
+
+StreamFlix's titles and synopses are fictional. The footage and the artwork stills come from
+these openly licensed films; thank you to their creators.
+
+| Film | Creator | Licence |
+|---|---|---|
+| *Sintel* (2010) | Blender Foundation, durian.blender.org | CC BY 3.0 |
+| *Big Buck Bunny* (2008) | Blender Foundation, peach.blender.org | CC BY 3.0 |
+| *Elephants Dream* (2006) | Blender Foundation / Netherlands Media Art Institute | CC BY 2.5 |
+| *Cosmos Laundromat: First Cycle* (2015) | Blender Institute | CC BY 4.0 |
+| *Sprite Fright* (2021) | Blender Studio | CC BY 4.0 |
+| *Caminandes 1–3* (2013–2016) | Blender Institute / Pablo Vazquez | CC BY 3.0 |
+| *flower.mp4* | MDN Web Docs | CC0 |
+
+Videos are streamed from the Internet Archive, W3C, MDN and test-videos.co.uk; stills were
+cropped and resized. Licences: https://creativecommons.org/licenses/
+

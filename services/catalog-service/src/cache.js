@@ -25,7 +25,18 @@ export function createCache({ url, log, prefix = 'catalog' }) {
       return { value, hit: false };
     },
     async invalidateAll() {
-      await redis.incr(versionKey).catch(() => {});
+      try {
+        // Called at startup too, before the connection is up: wait briefly for it.
+        if (redis.status !== 'ready') {
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(reject, 5000);
+            redis.once('ready', () => (clearTimeout(timer), resolve()));
+          });
+        }
+        await redis.incr(versionKey);
+      } catch {
+        log.warn('could not invalidate cache; entries will expire on their own');
+      }
     },
     ping: () => redis.ping(),
     close: () => redis.quit(),

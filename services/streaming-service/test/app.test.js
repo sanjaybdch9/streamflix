@@ -10,6 +10,8 @@ const VIDEO = Buffer.alloc(1000, 7);
 // A fake video origin that honours Range requests.
 function origin() {
   const app = express();
+  let flaky = 0;
+  app.get('/flaky.mp4', (_req, res) => (flaky++ === 0 ? res.status(500).end() : res.setHeader('content-type', 'video/mp4').end(VIDEO)));
   app.get('/video.mp4', (req, res) => {
     const m = /bytes=(\d+)-(\d*)/.exec(req.get('range') || '');
     res.setHeader('content-type', 'video/mp4');
@@ -28,6 +30,7 @@ async function setup(fn) {
     const catalog = {
       source: async (id) => {
         if (id === 'missing') throw new HttpError(404, 'Title not found');
+        if (id === 'flaky') return { id, videoUrl: `${originBase}/flaky.mp4` };
         return { id, videoUrl: id === 'evil' ? 'http://169.254.169.254/latest' : `${originBase}/video.mp4` };
       },
     };
@@ -55,6 +58,15 @@ test('issues a signed URL and proxies byte ranges', async () => {
     assert.equal(part.status, 206);
     assert.equal(part.headers.get('content-range'), 'bytes 100-199/1000');
     assert.equal((await part.arrayBuffer()).byteLength, 100);
+  });
+});
+
+test('retries once when the origin has a transient server error', async () => {
+  await setup(async (base) => {
+    const { body } = await session(base, 'flaky');
+    const res = await fetch(base + playPath(body.playbackUrl));
+    assert.equal(res.status, 200);
+    assert.equal((await res.arrayBuffer()).byteLength, VIDEO.length);
   });
 });
 
