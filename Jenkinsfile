@@ -11,7 +11,7 @@ pipeline {
 
   parameters {
     string(name: 'APP_DIR', defaultValue: '.', description: 'Path to the StreamFlix project inside the repo ("." = repository root)')
-    string(name: 'AWS_REGION', defaultValue: 'ap-south-1', description: 'AWS region of the EKS cluster and ECR')
+    string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'AWS region of the EKS cluster and ECR')
     string(name: 'AWS_ACCOUNT_ID', defaultValue: '', description: 'AWS account that owns ECR (12 digits)')
     string(name: 'CLUSTER_NAME', defaultValue: 'streamflix', description: 'EKS cluster name (terraform output cluster_name)')
     string(name: 'AWS_CREDENTIALS_ID', defaultValue: 'aws-credentials', description: 'Jenkins username/password credential: access key id / secret. Leave empty to use the agent instance role.')

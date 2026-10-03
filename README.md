@@ -122,7 +122,7 @@ terraform init && terraform apply
 Prometheus and Grafana.
 
 ```bash
-scripts/eks-bootstrap.sh ap-south-1 streamflix
+scripts/eks-bootstrap.sh us-east-1 streamflix
 ```
 
 **3. Build, push and deploy.** Let Jenkins do it (next section), or run the same steps by hand.
@@ -130,7 +130,7 @@ The script builds `linux/amd64` images, which matters on Apple Silicon Macs, pus
 runs `helm upgrade` with automatic rollback, and smoke-tests the result:
 
 ```bash
-scripts/deploy.sh ap-south-1 streamflix
+scripts/deploy.sh us-east-1 streamflix
 ```
 
 The app URL is the hostname of the `frontend` LoadBalancer service:

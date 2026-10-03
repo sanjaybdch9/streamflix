@@ -2,7 +2,7 @@
 # See values-eks.yaml for the AWS EKS overrides used by the Jenkins pipeline.
 
 global:
-  # Registry host, e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com. Empty = local images.
+  # Registry host, e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com. Empty = local images.
   imageRegistry: ""
   imageRepositoryPrefix: streamflix
   imageTag: latest

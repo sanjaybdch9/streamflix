@@ -5,7 +5,7 @@
 # Usage: scripts/eks-bootstrap.sh [region] [cluster-name]
 set -euo pipefail
 
-REGION="${1:-ap-south-1}"
+REGION="${1:-us-east-1}"
 CLUSTER="${2:-streamflix}"
 
 aws eks update-kubeconfig --region "$REGION" --name "$CLUSTER"

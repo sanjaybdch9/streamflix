@@ -1,5 +1,15 @@
 data "aws_availability_zones" "available" {
   state = "available"
+
+  # Regular AZs only: skip Local/Wavelength Zones the account may have opted into.
+  filter {
+    name   = "opt-in-status"
+    values = ["opt-in-not-required"]
+  }
+
+  # The EKS control plane cannot use these zone IDs. AZ names map to IDs differently per
+  # account, so "us-east-1a" might be use1-az3 in yours; excluding by ID is the reliable way.
+  exclude_zone_ids = ["use1-az3", "usw1-az2", "cac1-az3"]
 }
 
 locals {

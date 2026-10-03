@@ -20,7 +20,7 @@ pipeline, then how to run, troubleshoot and tear it down.
 All commands run from the `streamflix/` folder unless stated. Set your region once per terminal:
 
 ```bash
-export AWS_REGION=ap-south-1
+export AWS_REGION=us-east-1
 ```
 
 ---
@@ -51,7 +51,7 @@ export AWS_REGION=ap-south-1
 aws configure
 ```
 
-Enter the key, the secret, your region (`ap-south-1`) and output format `json`. Then verify:
+Enter the key, the secret, your region (`us-east-1`) and output format `json`. Then verify:
 
 ```bash
 aws sts get-caller-identity
@@ -83,12 +83,16 @@ By default, Terraform state is a local file. If you lose it, Terraform can no lo
 destroy what it created. For anything beyond a quick test, store the state in S3:
 
 ```bash
-aws s3api create-bucket --bucket streamflix-tfstate-$(aws sts get-caller-identity --query Account --output text) \
-  --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION
+BUCKET=streamflix-tfstate-$(aws sts get-caller-identity --query Account --output text)
+aws s3api create-bucket --bucket $BUCKET --region us-east-1
+aws s3api put-bucket-versioning --bucket $BUCKET --versioning-configuration Status=Enabled
+echo $BUCKET
 ```
 
-Then uncomment the `backend "s3"` block in `terraform/versions.tf` and fill in that bucket name
-and region. (In `us-east-1`, omit `--create-bucket-configuration`.)
+Then uncomment the `backend "s3"` block in `terraform/versions.tf` and set `bucket` to the
+printed name. Versioning lets you recover an earlier state file if one gets corrupted. (In any
+region other than `us-east-1`, `create-bucket` also needs
+`--create-bucket-configuration LocationConstraint=<region>`.)
 
 ### 2.2 Configure
 

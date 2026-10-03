@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-REGION="${1:-ap-south-1}"
+REGION="${1:-us-east-1}"
 CLUSTER="${2:-streamflix}"
 NAMESPACE="${NAMESPACE:-streamflix}"
 SERVICES="api-gateway auth-service catalog-service library-service streaming-service recommendation-service"
