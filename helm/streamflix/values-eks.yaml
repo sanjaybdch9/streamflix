@@ -1,10 +1,8 @@
 # AWS EKS overrides. The pipeline also sets global.imageRegistry and global.imageTag.
 frontend:
   service:
-    type: LoadBalancer
-    annotations:
-      service.beta.kubernetes.io/aws-load-balancer-type: nlb
-      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    # Internal only: visitors enter through Traefik (HTTPS), which routes to this service.
+    type: ClusterIP
   autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 6, targetCPUUtilizationPercentage: 70 }
 
 # Public HTTPS entry point through Traefik, with a free Let's Encrypt certificate
@@ -15,6 +13,13 @@ ingress:
   host: streamflixer.duckdns.org
   clusterIssuer: letsencrypt
   traefikHttpsRedirect: true
+
+services:
+  api-gateway:
+    env:
+      # Visitor → Traefik → frontend nginx → gateway: two proxies to trust, so rate limiting
+      # sees each visitor's real IP (Traefik drops X-Forwarded-For sent by clients).
+      TRUST_PROXY_HOPS: "2"
 
 global:
   imagePullPolicy: Always
